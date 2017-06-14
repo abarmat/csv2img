@@ -5,12 +5,12 @@ import itertools
 import os
 import grequests
 
-def save_file(dir_path, data):
+def save_file(dir_path, data, name):
     hasher = hashlib.sha256()
-    hasher.update(data)
-    name = os.path.join(dir_path, hasher.hexdigest())
-    if not os.path.exists(name):
-        with open(name, 'wb') as fobj:
+    hasher.update(name)
+    filepath = os.path.join(dir_path, hasher.hexdigest())
+    if not os.path.exists(filepath):
+        with open(filepath, 'wb') as fobj:
             fobj.write(data)
 
 def pick_field(fieldname):
@@ -36,7 +36,8 @@ def main():
     parser.add_argument('--datadir', type=str, required=True, help='Data dir to place the downloaded images.')
     parser.add_argument('--file', type=str, required=True, help='Input csv file.')
     parser.add_argument('--limit', type=int, default=None, help='Limit number of records to process.')
-    parser.add_argument('--c', type=int, default=10, help='Concurrent requests.')
+    parser.add_argument('--namer', type=str, choices=['urlhash', 'datahash'], default='url', help='Choose namer function for saved file.')
+    parser.add_argument('-c', type=int, default=10, help='Concurrent requests.')
     args = parser.parse_args()
 
     image_urls = itertools.imap(
@@ -45,9 +46,10 @@ def main():
     )
     reqs = itertools.imap(grequests.get, image_urls)
     for idx, res in enumerate(grequests.imap(reqs, size=args.c, exception_handler=exception_handler)):
-        if idx % 100 == 0:
+        if idx % (args.c * 10) == 0:
             print '[D] - %s' % idx
-        save_file(args.datadir, res.content)
+        print res.url
+        save_file(args.datadir, res.content, args.namer == 'urlhash' and res.url or res.content)
 
 if __name__ == '__main__':
     main()
